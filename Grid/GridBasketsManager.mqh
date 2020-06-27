@@ -1,5 +1,4 @@
 #include <Strategy/Utils/OrderUtils.mqh>
-#include <Strategy/Utils/NotificationUtils.mqh>
 #include <Strategy/List/ArrayList.mqh>
 #include <Strategy/List/ElementList.mqh>
 #include <Strategy/List/Iterator.mqh>
@@ -225,6 +224,7 @@ class GridBasketsManager {
     while(iterator.hasNext()){
       GridBasket *basketElt = (GridBasket*)iterator.next();
       basketElt.release();
+      delete basketElt;
     }
 
     delete iterator;

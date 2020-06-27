@@ -198,136 +198,172 @@ class BuySell {
     int lastError = 0;
     bool successfulOrder = false;
     bool modifyOrder = false;
+    bool isVolumeValide = checkVolumeValue(nbrLotsArg);
 
-    int StopLevel = (MarketInfo(instrument, MODE_STOPLEVEL) / (MathPow(10,MarketInfo(instrument, MODE_DIGITS)))) + (MarketInfo(instrument, MODE_SPREAD) / (MathPow(10,MarketInfo(instrument, MODE_DIGITS))));
+    if(isVolumeValide){
 
-    if(typeOrderArg == OP_BUYSTOP){
-      //OpenPrice-Ask ≥ StopLevel 	OpenPrice-SL ≥ StopLevel 	TP-OpenPrice ≥ StopLevel
-      if(priceArg > MarketInfo(instrument, MODE_ASK) && priceArg - MarketInfo(instrument, MODE_ASK) < StopLevel){
-        priceArg = MarketInfo(instrument, MODE_ASK) + StopLevel;
+      double StopLevel = (MarketInfo(instrument, MODE_STOPLEVEL) / (MathPow(10,MarketInfo(instrument, MODE_DIGITS)))) + (MarketInfo(instrument, MODE_SPREAD) / (MathPow(10,MarketInfo(instrument, MODE_DIGITS))));
+
+      if(typeOrderArg == OP_BUYSTOP){
+        //OpenPrice-Ask ≥ StopLevel 	OpenPrice-SL ≥ StopLevel 	TP-OpenPrice ≥ StopLevel
+        if(priceArg > MarketInfo(instrument, MODE_ASK) && priceArg - MarketInfo(instrument, MODE_ASK) < StopLevel){
+          priceArg = MarketInfo(instrument, MODE_ASK) + StopLevel;
+        }
+      } else if(typeOrderArg == OP_BUYLIMIT){
+        //Ask-OpenPrice ≥ StopLevel 	OpenPrice-SL ≥ StopLevel 	TP-OpenPrice ≥ StopLevel
+        if(priceArg < MarketInfo(instrument, MODE_ASK) &&  MarketInfo(instrument, MODE_ASK) - priceArg < StopLevel){
+          priceArg = MarketInfo(instrument, MODE_ASK) - StopLevel;
+        }
+      } else if(typeOrderArg == OP_SELLSTOP) {
+        //Bid-OpenPrice ≥ StopLevel 	SL-OpenPrice ≥ StopLevel 	OpenPrice-TP ≥ StopLevel
+        if(priceArg < MarketInfo(instrument, MODE_BID) &&  MarketInfo(instrument, MODE_BID) - priceArg < StopLevel){
+          priceArg = MarketInfo(instrument, MODE_BID) - StopLevel;
+        }
+      } else if(typeOrderArg == OP_SELLLIMIT){
+        //OpenPrice-Bid ≥ StopLevel 	SL-OpenPrice ≥StopLevel 	OpenPrice-TP ≥ StopLevel
+        if(priceArg > MarketInfo(instrument, MODE_BID) && priceArg - MarketInfo(instrument, MODE_BID) < StopLevel){
+          priceArg = MarketInfo(instrument, MODE_BID) + StopLevel;
+        }
+      } else if(typeOrderArg == OP_BUY){
+        //Bid-SL ≥ StopLevel 	TP-Bid ≥ StopLevel
+
+      } else if(typeOrderArg == OP_SELL){
+        //SL-Ask ≥ StopLevel 	Ask-TP ≥ StopLevel
+
       }
-    } else if(typeOrderArg == OP_BUYLIMIT){
-      //Ask-OpenPrice ≥ StopLevel 	OpenPrice-SL ≥ StopLevel 	TP-OpenPrice ≥ StopLevel
-      if(priceArg < MarketInfo(instrument, MODE_ASK) &&  MarketInfo(instrument, MODE_ASK) - priceArg < StopLevel){
-        priceArg = MarketInfo(instrument, MODE_ASK) - StopLevel;
-      }
-    } else if(typeOrderArg == OP_SELLSTOP) {
-      //Bid-OpenPrice ≥ StopLevel 	SL-OpenPrice ≥ StopLevel 	OpenPrice-TP ≥ StopLevel
-      if(priceArg < MarketInfo(instrument, MODE_BID) &&  MarketInfo(instrument, MODE_BID) - priceArg < StopLevel){
-        priceArg = MarketInfo(instrument, MODE_BID) - StopLevel;
-      }
-    } else if(typeOrderArg == OP_SELLLIMIT){
-      //OpenPrice-Bid ≥ StopLevel 	SL-OpenPrice ≥StopLevel 	OpenPrice-TP ≥ StopLevel
-      if(priceArg > MarketInfo(instrument, MODE_BID) && priceArg - MarketInfo(instrument, MODE_BID) < StopLevel){
-        priceArg = MarketInfo(instrument, MODE_BID) + StopLevel;
-      }
-    } else if(typeOrderArg == OP_BUY){
-      //Bid-SL ≥ StopLevel 	TP-Bid ≥ StopLevel
 
-    } else if(typeOrderArg == OP_SELL){
-      //SL-Ask ≥ StopLevel 	Ask-TP ≥ StopLevel
+      if(!notifyInsteadOfSendingOrder){
+        for(int attempt=0; attempt<TRADE_RETRY_COUNT; attempt++) {
 
-    }
-
-    if(!notifyInsteadOfSendingOrder){
-      for(int attempt=0; attempt<TRADE_RETRY_COUNT; attempt++) {
-
-        if(!isECNBrokerArg){
-          //NONE ECN Broker
-          ticket = OrderSend(instrument, typeOrderArg, priceUtils.normalizeEntrySize(nbrLotsArg), priceUtils.normalizePrice(priceArg), priceUtils.getsPointsFromPips(slippageInPips), priceUtils.normalizePrice(stopLossArg), priceUtils.normalizePrice(takeProfitArg), commentArg != NULL ? commentArg : getDescription(pipPriceArg, maxLossArg, magicArg), magicArg, 0, colorOrder);
-          if(ticket < 0)
-          {
-            lastError = GetLastError();
-            errorUtils.displayError("---------------");
-            errorUtils.displayError("Attempt #"+string(attempt+1));
-            errorUtils.displayError(lastError, errorDisplay);
-            errorUtils.displayError(getBuySellArgs(priceArg, typeOrderArg, instrument, nbrLotsArg, stopLossArg, takeProfitArg, pipPriceArg, maxLossArg, magicArg, isECNBrokerArg));
-            errorUtils.displayError("---------------");
-            if(lastError == 130){
-              isLastError130 = true;
-            }
-            successfulOrder = false;
-          } else {
-            successfulOrder = true;
-            modifyOrder = true;
-            isLastError130 = false;
-            break;
-          }
-        } else {
-          //ECN Borker
-          if(successfulOrder == false){
-            ticket = OrderSend(instrument, typeOrderArg, priceUtils.normalizeEntrySize(nbrLotsArg), priceUtils.normalizePrice(priceArg), priceUtils.getsPointsFromPips(slippageInPips), 0, 0, commentArg != NULL ? commentArg : getDescription(pipPriceArg, maxLossArg, magicArg), magicArg);
-          }
-          if(ticket < 0)
-          {
-            lastError = GetLastError();
-            errorUtils.displayError("--------------- ECN Detected");
-            errorUtils.displayError("Attempt #"+string(attempt+1));
-            errorUtils.displayError(lastError, errorDisplay);
-            errorUtils.displayError(getBuySellArgs(priceArg, typeOrderArg, instrument, nbrLotsArg, stopLossArg, takeProfitArg, pipPriceArg, maxLossArg, magicArg, isECNBrokerArg));
-            errorUtils.displayError("---------------");
-            if(lastError == 130){
-              isLastError130 = true;
-            }
-            successfulOrder = false;
-          } else if(stopLossArg !=0 || takeProfitArg != 0)  {
-            successfulOrder = true;
-            isLastError130 = false;
-            bool res = OrderModify(ticket, priceUtils.normalizePrice(priceArg), priceUtils.normalizePrice(stopLossArg), priceUtils.normalizePrice(takeProfitArg), 0);
-            if(!res) {
-              errorUtils.displayError("---------------  ECN Detected");
+          if(!isECNBrokerArg){
+            //NONE ECN Broker
+            ticket = OrderSend(instrument, typeOrderArg, priceUtils.normalizeEntrySize(nbrLotsArg), priceUtils.normalizePrice(priceArg), priceUtils.getsPointsFromPips(slippageInPips), priceUtils.normalizePrice(stopLossArg), priceUtils.normalizePrice(takeProfitArg), commentArg != NULL ? commentArg : getDescription(pipPriceArg, maxLossArg, magicArg), magicArg, 0, colorOrder);
+            if(ticket < 0)
+            {
+              lastError = GetLastError();
+              errorUtils.displayError("---------------");
               errorUtils.displayError("Attempt #"+string(attempt+1));
-              errorUtils.displayError(GetLastError(), "Modify Order Error");
-              errorUtils.displayError("IMPORTANT: ORDER #"+ string(ticket)+ " HAS NO stopLossArg AND takeProfitArg");
+              errorUtils.displayError(lastError, errorDisplay);
               errorUtils.displayError(getBuySellArgs(priceArg, typeOrderArg, instrument, nbrLotsArg, stopLossArg, takeProfitArg, pipPriceArg, maxLossArg, magicArg, isECNBrokerArg));
               errorUtils.displayError("---------------");
-              modifyOrder = false;
+              if(lastError == 130){
+                isLastError130 = true;
+              }
+              successfulOrder = false;
             } else {
+              successfulOrder = true;
               modifyOrder = true;
+              isLastError130 = false;
               break;
             }
           } else {
-            successfulOrder = true;
-            isLastError130 = false;
-            modifyOrder = true;
+            //ECN Borker
+            if(successfulOrder == false){
+              ticket = OrderSend(instrument, typeOrderArg, priceUtils.normalizeEntrySize(nbrLotsArg), priceUtils.normalizePrice(priceArg), priceUtils.getsPointsFromPips(slippageInPips), 0, 0, commentArg != NULL ? commentArg : getDescription(pipPriceArg, maxLossArg, magicArg), magicArg);
+            }
+            if(ticket < 0)
+            {
+              lastError = GetLastError();
+              errorUtils.displayError("--------------- ECN Detected");
+              errorUtils.displayError("Attempt #"+string(attempt+1));
+              errorUtils.displayError(lastError, errorDisplay);
+              errorUtils.displayError(getBuySellArgs(priceArg, typeOrderArg, instrument, nbrLotsArg, stopLossArg, takeProfitArg, pipPriceArg, maxLossArg, magicArg, isECNBrokerArg));
+              errorUtils.displayError("---------------");
+              if(lastError == 130){
+                isLastError130 = true;
+              }
+              successfulOrder = false;
+            } else if(stopLossArg !=0 || takeProfitArg != 0)  {
+              successfulOrder = true;
+              isLastError130 = false;
+              bool res = OrderModify(ticket, priceUtils.normalizePrice(priceArg), priceUtils.normalizePrice(stopLossArg), priceUtils.normalizePrice(takeProfitArg), 0);
+              if(!res) {
+                errorUtils.displayError("---------------  ECN Detected");
+                errorUtils.displayError("Attempt #"+string(attempt+1));
+                errorUtils.displayError(GetLastError(), "Modify Order Error");
+                errorUtils.displayError("IMPORTANT: ORDER #"+ string(ticket)+ " HAS NO stopLossArg AND takeProfitArg");
+                errorUtils.displayError(getBuySellArgs(priceArg, typeOrderArg, instrument, nbrLotsArg, stopLossArg, takeProfitArg, pipPriceArg, maxLossArg, magicArg, isECNBrokerArg));
+                errorUtils.displayError("---------------");
+                modifyOrder = false;
+              } else {
+                modifyOrder = true;
+                break;
+              }
+            } else {
+              successfulOrder = true;
+              isLastError130 = false;
+              modifyOrder = true;
+            }
+          }
+          if(successfulOrder == true && modifyOrder == false){
+            Sleep(TRADE_CHANGE_SL_TP_RETRY_WAIT);
+          } else {
+            Sleep(TRADE_RETRY_WAIT);
           }
         }
-        if(successfulOrder == true && modifyOrder == false){
-          Sleep(TRADE_CHANGE_SL_TP_RETRY_WAIT);
-        } else {
-          Sleep(TRADE_RETRY_WAIT);
+      } else {
+        string typeOrder;
+        if(typeOrderArg == OP_BUY){
+          typeOrder = "Buy order";
+        } else if(typeOrderArg == OP_SELL){
+          typeOrder = "Sell order";
+        } else if(typeOrderArg == OP_BUYLIMIT){
+          typeOrder = "Buy limit Order (" + string(priceUtils.normalizePrice(priceArg))+")";
+        } else if(typeOrderArg == OP_SELLLIMIT){
+          typeOrder = "Sell Limit Order (" + string(priceUtils.normalizePrice(priceArg))+")";
+        } else if(typeOrderArg == OP_BUYSTOP){
+          typeOrder = "Buy Stop Order (" + string(priceUtils.normalizePrice(priceArg))+")";
+        } else if(typeOrderArg == OP_SELLSTOP){
+          typeOrder = "Sell Stop Order (" + string(priceUtils.normalizePrice(priceArg))+")";
         }
-      }
-    } else {
-      string typeOrder;
-      if(typeOrderArg == OP_BUY){
-        typeOrder = "Buy order";
-      } else if(typeOrderArg == OP_SELL){
-        typeOrder = "Sell order";
-      } else if(typeOrderArg == OP_BUYLIMIT){
-        typeOrder = "Buy limit Order (" + string(priceUtils.normalizePrice(priceArg))+")";
-      } else if(typeOrderArg == OP_SELLLIMIT){
-        typeOrder = "Sell Limit Order (" + string(priceUtils.normalizePrice(priceArg))+")";
-      } else if(typeOrderArg == OP_BUYSTOP){
-        typeOrder = "Buy Stop Order (" + string(priceUtils.normalizePrice(priceArg))+")";
-      } else if(typeOrderArg == OP_SELLSTOP){
-        typeOrder = "Sell Stop Order (" + string(priceUtils.normalizePrice(priceArg))+")";
+
+        notificationUtils.sendNotification(
+          instrument+" - "+typeOrder+
+          " : "+getBuySellArgs(priceArg, typeOrderArg, instrument, nbrLotsArg, stopLossArg, takeProfitArg, pipPriceArg, maxLossArg, magicArg, isECNBrokerArg), notifyWithPush, notifyWithEmail, notifyWithAlert);
       }
 
-      notificationUtils.sendNotification(
-        instrument+" - "+typeOrder+
-        " : "+getBuySellArgs(priceArg, typeOrderArg, instrument, nbrLotsArg, stopLossArg, takeProfitArg, pipPriceArg, maxLossArg, magicArg, isECNBrokerArg), notifyWithPush, notifyWithEmail, notifyWithAlert);
-    }
+      if(successfulOrder == true && modifyOrder == false){
+        closeOrder(ticket, true);
+      }
 
-    if(successfulOrder == true && modifyOrder == false){
-      closeOrder(ticket, true);
-    }
-
-    if(ticket > 0){
-      lastTicket = ticket;
+      if(ticket > 0){
+        lastTicket = ticket;
+      }
     }
 
     return successfulOrder && modifyOrder;
+  }
+
+  bool checkVolumeValue(double volumeArg) {
+    string description;
+  //--- minimal allowed volume for trade operations
+     double min_volume=SymbolInfoDouble(Symbol(),SYMBOL_VOLUME_MIN);
+     if(volumeArg<min_volume)
+       {
+        description=StringFormat("Volume is less than the minimal allowed SYMBOL_VOLUME_MIN=%.2f",min_volume);
+        return(false);
+       }
+
+  //--- maximal allowed volume of trade operations
+     double max_volume=SymbolInfoDouble(Symbol(),SYMBOL_VOLUME_MAX);
+     if(volumeArg>max_volume)
+       {
+        description=StringFormat("Volume is greater than the maximal allowed SYMBOL_VOLUME_MAX=%.2f",max_volume);
+        return(false);
+       }
+
+  //--- get minimal step of volume changing
+     double volume_step=SymbolInfoDouble(Symbol(),SYMBOL_VOLUME_STEP);
+
+     int ratio=(int)MathRound(volumeArg/volume_step);
+     if(MathAbs(ratio*volume_step-volumeArg)>0.0000001)
+       {
+        description=StringFormat("Volume is not a multiple of the minimal step SYMBOL_VOLUME_STEP=%.2f, the closest correct volume is %.2f",
+                                 volume_step,ratio*volume_step);
+        return(false);
+       }
+     description="Correct volume value";
+     return(true);
   }
 
   bool closeOrder(int ticket){
@@ -412,34 +448,38 @@ class BuySell {
   }
 
   bool closeAllOpenOrdersForCurrency(){
-    return closeAllOpenOrdersForSpecificCurrency(-1, Symbol(), NULL, NULL, true, true);
+    return closeAllOpenOrdersForSpecificCurrency(-1, Symbol(), NULL, NULL, true, true, 1);
   }
 
   bool closeAllOpenOrdersForSpecificCurrency(string currency){
-    return closeAllOpenOrdersForSpecificCurrency(-1, currency, NULL, NULL, true, true);
+    return closeAllOpenOrdersForSpecificCurrency(-1, currency, NULL, NULL, true, true, 1);
   }
 
   bool closeAllOpenOrdersForAllCurrencies(){
-    return closeAllOpenOrdersForSpecificCurrency(-1, NULL, NULL, NULL, true, true);
+    return closeAllOpenOrdersForSpecificCurrency(-1, NULL, NULL, NULL, true, true, 1);
   }
 
   bool closeAllOpenOrdersForAllCurrencies(int magicNumberArg){
-    return closeAllOpenOrdersForSpecificCurrency(-1, NULL, magicNumberArg, NULL, true, true);
+    return closeAllOpenOrdersForSpecificCurrency(-1, NULL, magicNumberArg, NULL, true, true, 1);
   }
 
   bool closeAllOpenOrdersForSpecificCurrency(string instrumentArg, int magicNumberArg){
-    return closeAllOpenOrdersForSpecificCurrency(-1, instrumentArg, magicNumberArg, NULL, true, true);
+    return closeAllOpenOrdersForSpecificCurrency(-1, instrumentArg, magicNumberArg, NULL, true, true, 1);
+  }
+
+  bool closeAllOpenOrdersForSpecificCurrency(string instrumentArg, int magicNumberArg, double partialMultiplicatorArg){
+    return closeAllOpenOrdersForSpecificCurrency(-1, instrumentArg, magicNumberArg, NULL, true, true, partialMultiplicatorArg);
   }
 
   bool closeAllOpenOrdersForSpecificCurrency(string instrumentArg, int magicNumberArg, string commentArg){
-    return closeAllOpenOrdersForSpecificCurrency(-1, instrumentArg, magicNumberArg, commentArg, true, true);
+    return closeAllOpenOrdersForSpecificCurrency(-1, instrumentArg, magicNumberArg, commentArg, true, true, 1);
   }
 
   bool closeAllOpenOrdersForSpecificCurrency(int typeOrderArg, string instrumentArg, int magicNumberArg, string commentArg){
-    return closeAllOpenOrdersForSpecificCurrency(typeOrderArg, instrumentArg, magicNumberArg, commentArg, true, true);
+    return closeAllOpenOrdersForSpecificCurrency(typeOrderArg, instrumentArg, magicNumberArg, commentArg, true, true, 1);
   }
 
-  bool closeAllOpenOrdersForSpecificCurrency(int typeOrderArg, string instrumentArg, int magicNumberArg, string commentArg, bool loosingOrders, bool winningOrders){
+  bool closeAllOpenOrdersForSpecificCurrency(int typeOrderArg, string instrumentArg, int magicNumberArg, string commentArg, bool loosingOrders, bool winningOrders, double partialMultiplicator){
     bool successfulOperation = true;
 
     int total = OrdersTotal();
@@ -471,13 +511,13 @@ class BuySell {
       bool successfulClose = false;
       if(selected == true  && orderTypeCheck == true && OrderCloseTime() == 0 && instrumentChecked == true && magicChecked == true && commentCheck == true){
         for(int attempt=0; attempt<TRADE_RETRY_COUNT; attempt++) {
-          bool res = OrderClose(OrderTicket(), OrderLots(), OrderClosePrice(), priceUtils.getsPointsFromPips(slippageInPips));
+          bool res = OrderClose(OrderTicket(), OrderLots() * partialMultiplicator, OrderClosePrice(), priceUtils.getsPointsFromPips(slippageInPips));
 
           if(res == false){
             errorUtils.displayError("---------------");
             errorUtils.displayError("Attempt #"+string(attempt+1));
             errorUtils.displayError(GetLastError(), "Close Order Error : ticket #"+string(OrderTicket()));
-            errorUtils.displayError("Lots : "+string(OrderLots())+" - "+"Order Close Price : "+string(OrderClosePrice())+" - "+"Slippage : "+string(priceUtils.getsPointsFromPips(slippageInPips)));
+            errorUtils.displayError("Lots : "+string(OrderLots() * partialMultiplicator)+" - "+"Order Close Price : "+string(OrderClosePrice())+" - "+"Slippage : "+string(priceUtils.getsPointsFromPips(slippageInPips)));
             errorUtils.displayError("---------------");
             successfulClose = false;
           } else {
@@ -853,7 +893,7 @@ class BuySell {
   string getBuySellArgs(double priceArg, int typeOrder, string instrument, double nbrLotsArg, double stopLossArg, double takeProfitArg, double pipPriceArg, double maxLoss, int magicArg, bool isECNBrokerArg){
 
     string buySellArgs = "Symbol : "  + string(instrument) + " - "+
-    "PriceOrder : " + string(priceUtils.normalizeEntrySize(priceArg)) + " - "+
+    "PriceOrder : " + string(priceUtils.normalizePrice(priceArg)) + " - "+
     "Lots : " + string(priceUtils.normalizeEntrySize(nbrLotsArg)) + " - "+
     "Slippage  : "  + string(priceUtils.getsPointsFromPips(slippageInPips)) + " - "+
     "Stop Loss : " + string(priceUtils.normalizePrice(stopLossArg)) + " - "+

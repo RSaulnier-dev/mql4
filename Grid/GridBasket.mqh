@@ -483,7 +483,7 @@ class GridBasket : public ElementList {
             newOrdersAdded = addBuyOrder() || newOrdersAdded;
           } else if(this.closeAfterReachMaxNbrOrder){
             this.closedWhenReachMaxNbrOrder = true;
-            this.displayUtils.drawOrMoveVerticalLine("buyCloseAfterReachMaxNbrOrder", Green);
+            this.displayUtils.drawOrMoveVerticalLine("buyCloseAfterReachMaxNbrOrder", Green, false);
             closeBasket();
           }
       } else if(typeBuyOrSellOrder == OP_SELL && MarketInfo(symbolToTrade,MODE_BID) > this.nextOrderLevel
@@ -492,7 +492,7 @@ class GridBasket : public ElementList {
             newOrdersAdded = addSellOrder() || newOrdersAdded;
           } else if(this.closeAfterReachMaxNbrOrder){
             this.closedWhenReachMaxNbrOrder = true;
-            this.displayUtils.drawOrMoveVerticalLine("sellCloseAfterReachMaxNbrOrder", Red);
+            this.displayUtils.drawOrMoveVerticalLine("sellCloseAfterReachMaxNbrOrder", Red, false);
             closeBasket();
           }
       }
@@ -1062,6 +1062,7 @@ class GridBasket : public ElementList {
 
     if(!(this.gridCoverStrategy.calculateTrendAfterFirstOrder() && nbrPositionsOpen <= this.gridCoverStrategy.getNbrOrdersForStartingCover() + 1)){
       calculateNewTakeProfit();
+      Print(orderCommentForBasket+" : New take profit -> "+string(takeProfitLevel));
 
       if(takeProfitCalcultationType != OnStrategySignal && trailingSLType == noTrailingSL){
         orderUtils.updateTPForTicketsOpenWithMagicNumberAndComment(this.typeBuyOrSellOrder, takeProfitLevel, this.magicNumberValue, this.orderCommentForBasket);

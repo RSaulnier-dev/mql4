@@ -135,7 +135,7 @@ class ArrayList {
   }
 
   void release(){
-    if(FirstElement != NULL){
+    if(CheckPointer(FirstElement) != POINTER_INVALID && FirstElement != NULL){
       ElementList *tempElt = FirstElement;
       while(CheckPointer(tempElt.getNext()) != POINTER_INVALID && tempElt.getNext() != NULL){
         tempElt = tempElt.getNext();

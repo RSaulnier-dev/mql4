@@ -377,6 +377,7 @@ class GridStrategy : public GridBasketSignalStrategy {
       delete gridBasketsManager;
     }
 
+    orderUtils.release();
     delete this.orderUtils;
   }
 
